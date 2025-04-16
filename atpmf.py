@@ -259,7 +259,7 @@ if __name__ == "__main__":
     # --- Ví dụ cho ảnh màu ---
     try:
         # Đọc ảnh màu (thay 'color_image.png' bằng đường dẫn thực tế)
-        color_image = cv2.imread('lena_color.png', cv2.IMREAD_COLOR)
+        color_image = cv2.imread('anhdomixi.png', cv2.IMREAD_COLOR)
         if color_image is None:
             print("Không thể đọc ảnh màu.")
         else:
@@ -269,7 +269,7 @@ if __name__ == "__main__":
             cv2.imshow('original_color_image.png', color_image)
 
             # --- Thêm nhiễu Salt & Pepper ---
-            noise_ratio_sp = 0.8 # Tỷ lệ nhiễu S&P
+            noise_ratio_sp = 0.5 # Tỷ lệ nhiễu S&P
             noisy_color_image_sp = color_image.copy()
             num_noise_per_channel = int(noise_ratio_sp * color_image.shape[0] * color_image.shape[1])
 
