@@ -102,11 +102,11 @@ def atpmf_grayscale(X, W1_size=3, W2_size=3, a=1.0, b=1.0):
     # # Cần triển khai median filter tùy chỉnh nếu muốn làm theo cách này hiệu quả.
 
     # Chuyển về kiểu dữ liệu gốc nếu cần (ví dụ uint8)
-    # if X.dtype == np.uint8:
-    #     Z = np.clip(Z, 0, 255).astype(np.uint8)
-    # else:
-    #     # Giữ nguyên float nếu đầu vào là float
-    #     pass # Hoặc clip về [0, 1] nếu đầu vào là float 0-1
+    if X.dtype == np.uint8:
+        Z = np.clip(Z, 0, 255).astype(np.uint8)
+    else:
+        # Giữ nguyên float nếu đầu vào là float
+        pass # Hoặc clip về [0, 1] nếu đầu vào là float 0-1
 
     return Z
 
@@ -155,12 +155,43 @@ def atpmf_color_per_channel(X_color, W1_size=3, W2_size=3, a=1.0, b=1.0):
 
     return Z_color
 
+
+
+def add_gaussian_noise(image, mean=0, var=10):
+    sigma = var*0.5
+    gauss = np.random.normal(mean, sigma, size=image.shape).astype('float32')  # Use size parameter
+    noisy = image.astype('float32') + gauss
+    noisy = np.clip(noisy, 0, 255)
+    return noisy.astype('uint8')
+
+def add_speckle_noise(image):
+    noise = np.random.randn(*image.shape).astype('float32')  # Unpack the shape tuple
+    noisy = image.astype('float32') + image.astype('float32') * noise
+    return np.clip(noisy, 0, 255).astype('uint8')
+
+
+
+def add_salt_and_pepper_noise(image, salt_prob, pepper_prob):
+    noisy = np.copy(image)
+    # Salt noise
+    num_salt = np.ceil(salt_prob * image.size)
+    coords = [np.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
+    noisy[coords[0], coords[1]] = 255
+
+    # Pepper noise
+    num_pepper = np.ceil(pepper_prob * image.size)
+    coords = [np.random.randint(0, i - 1, int(num_pepper)) for i in image.shape]
+    noisy[coords[0], coords[1]] = 0
+
+    return noisy.astype(image.dtype)
+
+
 # --- Ví dụ sử dụng ---
 if __name__ == "__main__":
     # --- Ví dụ cho ảnh thang độ xám ---
     try:
         # Đọc ảnh thang độ xám (thay 'grayscale_image.png' bằng đường dẫn thực tế)
-        gray_image = cv2.imread('lena.jpg', cv2.IMREAD_GRAYSCALE)
+        gray_image = cv2.imread('lena*****.jpg', cv2.IMREAD_GRAYSCALE)
         if gray_image is None:
             print("Không thể đọc ảnh thang độ xám.")
         else:
@@ -170,7 +201,7 @@ if __name__ == "__main__":
             cv2.imshow('original.png', gray_image)
 
             # Thêm nhiễu xung (ví dụ: salt & pepper) để kiểm tra
-            noise_ratio = 0.5 # 20% nhiễu
+            noise_ratio = 0.4 # 20% nhiễu
             noisy_gray_image = gray_image.copy().astype(np.float64)
             num_noise = int(noise_ratio * gray_image.size)
 
@@ -183,8 +214,28 @@ if __name__ == "__main__":
             noisy_gray_image[pepper_coords[0], pepper_coords[1]] = 0
 
             noisy_gray_image = noisy_gray_image.astype(gray_image.dtype)
-            cv2.imshow('noisy_gray_image.png', noisy_gray_image)
+            cv2.imshow('pepper_gray_image.png', noisy_gray_image)
             print("Đã tạo ảnh thang độ xám bị nhiễu: noisy_gray_image.png")
+
+
+            # thêm nhiễu Gaussian
+            gaussian_noisy_gray_image = add_gaussian_noise(gray_image, mean=0, var=10)
+            cv2.imshow('gaussian_gray_image.png', gaussian_noisy_gray_image)
+
+            filtered_gaussian_gray_image = atpmf_grayscale(gaussian_noisy_gray_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
+            cv2.imshow('filtered_gaussian_gray_image.png', filtered_gaussian_gray_image)
+
+
+            # Thêm nhiễu speckle
+            speckle_noisy_gray_image = add_speckle_noise(gray_image)
+            cv2.imshow('speckle_noisy_gray_image.png', speckle_noisy_gray_image)
+            print("Đã tạo ảnh thang độ xám bị nhiễu speckle: speckle_noisy_gray_image.png")
+
+            filtered_speckle_gray_image = atpmf_grayscale(speckle_noisy_gray_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
+            cv2.imshow('filtered_speckle_gray_image.png', filtered_speckle_gray_image)
+            print("Đã lọc ảnh thang độ xám bị nhiễu speckle: filtered_speckle_gray_image.png")
+
+
 
             # Áp dụng bộ lọc ATPMF
             filtered_gray_image = atpmf_grayscale(noisy_gray_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
@@ -208,7 +259,7 @@ if __name__ == "__main__":
     # --- Ví dụ cho ảnh màu ---
     try:
         # Đọc ảnh màu (thay 'color_image.png' bằng đường dẫn thực tế)
-        color_image = cv2.imread('images.jpg', cv2.IMREAD_COLOR)
+        color_image = cv2.imread('lena_color.png', cv2.IMREAD_COLOR)
         if color_image is None:
             print("Không thể đọc ảnh màu.")
         else:
@@ -217,34 +268,60 @@ if __name__ == "__main__":
             # Hiển thị ảnh gốc
             cv2.imshow('original_color_image.png', color_image)
 
-            # Thêm nhiễu xung cho ảnh màu (ví dụ salt & pepper trên từng kênh)
-            noise_ratio = 1
-            noisy_color_image = color_image.copy()
-            num_noise_per_channel = int(noise_ratio * color_image.shape[0] * color_image.shape[1]) // 3
+            # --- Thêm nhiễu Salt & Pepper ---
+            noise_ratio_sp = 0.8 # Tỷ lệ nhiễu S&P
+            noisy_color_image_sp = color_image.copy()
+            num_noise_per_channel = int(noise_ratio_sp * color_image.shape[0] * color_image.shape[1])
 
             for i in range(3): # Lặp qua 3 kênh màu
                 # Salt noise
-                coords = [np.random.randint(0, dim - 1, num_noise_per_channel // 2) for dim in color_image.shape[:2]]
-                noisy_color_image[coords[0], coords[1], i] = 255
+                salt_coords = [np.random.randint(0, dim - 1, num_noise_per_channel // 2) for dim in color_image.shape[:2]]
+                noisy_color_image_sp[salt_coords[0], salt_coords[1], i] = 255
                  # Pepper noise
-                coords = [np.random.randint(0, dim - 1, num_noise_per_channel // 2) for dim in color_image.shape[:2]]
-                noisy_color_image[coords[0], coords[1], i] = 0
+                pepper_coords = [np.random.randint(0, dim - 1, num_noise_per_channel // 2) for dim in color_image.shape[:2]]
+                noisy_color_image_sp[pepper_coords[0], pepper_coords[1], i] = 0
 
-            cv2.imshow('noisy_color_image.png', noisy_color_image)
-            print("Đã tạo ảnh màu bị nhiễu: noisy_color_image.png")
+            cv2.imshow('sp_noisy_color_image.png', noisy_color_image_sp)
+            print("Đã tạo ảnh màu bị nhiễu Salt & Pepper: sp_noisy_color_image.png")
 
-             # Áp dụng bộ lọc ATPMF trên từng kênh
-            # filtered_color_image = atpmf_color_per_channel(noisy_color_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
-            filtered_color_image = atpmf_color_per_channel(color_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
+            # --- Thêm nhiễu Gaussian ---
+            gaussian_noisy_color_image = add_gaussian_noise(color_image, mean=0, var=20) # Tăng var cho ảnh màu
+            cv2.imshow('gaussian_noisy_color_image.png', gaussian_noisy_color_image)
+            print("Đã tạo ảnh màu bị nhiễu Gaussian: gaussian_noisy_color_image.png")
 
-            cv2.imshow('filtered_atpmf_color.png', filtered_color_image)
-            print("Đã lọc ảnh màu bằng ATPMF (từng kênh): filtered_atpmf_color.png")
+            # --- Thêm nhiễu Speckle ---
+            speckle_noisy_color_image = add_speckle_noise(color_image)
+            cv2.imshow('speckle_noisy_color_image.png', speckle_noisy_color_image)
+            print("Đã tạo ảnh màu bị nhiễu Speckle: speckle_noisy_color_image.png")
 
-            # So sánh với Median Filter thông thường (áp dụng từng kênh không tối ưu màu)
-            # Hoặc dùng medianBlur của OpenCV (thường hiệu quả hơn cho màu)
-            filtered_median_color = cv2.medianBlur(noisy_color_image, 3)
-            cv2.imshow('filtered_median_color.png', filtered_median_color)
-            print("Đã lọc ảnh màu bằng Median thông thường (cv2.medianBlur): filtered_median_color.png")
+
+            # --- Áp dụng bộ lọc ATPMF trên từng loại nhiễu ---
+            # Lọc nhiễu S&P
+            filtered_sp_color_image = atpmf_color_per_channel(noisy_color_image_sp, W1_size=3, W2_size=3, a=1.0, b=1.0)
+            cv2.imshow('filtered_atpmf_sp_color.png', filtered_sp_color_image)
+            print("Đã lọc ảnh màu nhiễu S&P bằng ATPMF: filtered_atpmf_sp_color.png")
+
+            # Lọc nhiễu Gaussian
+            filtered_gaussian_color_image = atpmf_color_per_channel(gaussian_noisy_color_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
+            cv2.imshow('filtered_atpmf_gaussian_color.png', filtered_gaussian_color_image)
+            print("Đã lọc ảnh màu nhiễu Gaussian bằng ATPMF: filtered_atpmf_gaussian_color.png")
+
+            # Lọc nhiễu Speckle
+            filtered_speckle_color_image = atpmf_color_per_channel(speckle_noisy_color_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
+            cv2.imshow('filtered_atpmf_speckle_color.png', filtered_speckle_color_image)
+            print("Đã lọc ảnh màu nhiễu Speckle bằng ATPMF: filtered_atpmf_speckle_color.png")
+
+
+            # --- So sánh với Median Filter thông thường (ví dụ trên nhiễu S&P) ---
+            filtered_median_color_sp = cv2.medianBlur(noisy_color_image_sp, 3)
+            cv2.imshow('filtered_median_color_sp.png', filtered_median_color_sp)
+            print("Đã lọc ảnh màu nhiễu S&P bằng Median thông thường: filtered_median_color_sp.png")
+
+            # (Tùy chọn) So sánh Median Filter trên các nhiễu khác
+            # filtered_median_color_gauss = cv2.medianBlur(gaussian_noisy_color_image, 3)
+            # cv2.imshow('filtered_median_color_gauss.png', filtered_median_color_gauss)
+            # filtered_median_color_speckle = cv2.medianBlur(speckle_noisy_color_image, 3)
+            # cv2.imshow('filtered_median_color_speckle.png', filtered_median_color_speckle)
 
 
             cv2.waitKey(0)
