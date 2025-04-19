@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.ndimage import median_filter
 import cv2 # Hoặc from PIL import Image
+import matplotlib.pyplot as plt # Thư viện để vẽ biểu đồ
 
 def adaptive_two_pass_median_filter(noisy_image, w1_size=3, w2_size=3, a=1.0, b=1.0):
     """
@@ -92,46 +93,135 @@ def adaptive_two_pass_median_filter(noisy_image, w1_size=3, w2_size=3, a=1.0, b=
 
     return Z
 
-# --- Ví dụ sử dụng ---
+#Thêm nhiễu
+def add_salt_and_pepper_noise(image, percentage):
+    """
+    Thêm nhiễu Salt and Pepper vào ảnh.
+
+    Args:
+        image (np.ndarray): Ảnh đầu vào (thang xám).
+        percentage (float): Tỷ lệ nhiễu (từ 0.0 đến 1.0).
+
+    Returns:
+        np.ndarray: Ảnh đã thêm nhiễu.
+    """
+    noisy_image = image.copy()
+    rows, cols = image.shape
+    num_noise_pixels = int(rows * cols * percentage)
+
+    # Chọn ngẫu nhiên các tọa độ để thêm nhiễu
+    x_coords = np.random.randint(0, rows, num_noise_pixels)
+    y_coords = np.random.randint(0, cols, num_noise_pixels)
+
+    # Chia gần đều số lượng salt (255) và pepper (0)
+    num_salt = num_noise_pixels // 2
+    num_pepper = num_noise_pixels - num_salt
+
+    # Thêm nhiễu salt (255)
+    noisy_image[x_coords[:num_salt], y_coords[:num_salt]] = 255
+
+    # Thêm nhiễu pepper (0)
+    noisy_image[x_coords[num_salt:], y_coords[num_salt:]] = 0
+
+    return noisy_image
+
+
+#Tính MSE và MAE
+def calculate_mse(image_original, image_processed):
+    """Tính Mean Squared Error (MSE) giữa hai ảnh."""
+    if image_original.shape != image_processed.shape:
+        raise ValueError("Kích thước hai ảnh phải giống nhau để tính MSE.")
+    # Chuyển sang float để tránh lỗi tràn số khi trừ
+    err = np.sum((image_original.astype("float") - image_processed.astype("float")) ** 2)
+    mse = err / float(image_original.shape[0] * image_original.shape[1])
+    return mse
+
+def calculate_mae(image_original, image_processed):
+    """Tính Mean Absolute Error (MAE) giữa hai ảnh."""
+    if image_original.shape != image_processed.shape:
+        raise ValueError("Kích thước hai ảnh phải giống nhau để tính MAE.")
+    # Chuyển sang float để tránh lỗi tràn số khi trừ
+    err = np.sum(np.abs(image_original.astype("float") - image_processed.astype("float")))
+    mae = err / float(image_original.shape[0] * image_original.shape[1])
+    return mae
+
 if __name__ == '__main__':
-    # Đọc ảnh (ví dụ: sử dụng OpenCV)
+    # --- 1. Tải ảnh gốc (sạch, chưa có nhiễu) ---
+    # Thay 'lena_gray.png' bằng đường dẫn đến ảnh thang xám gốc của bạn
+    # Bạn có thể tìm ảnh test như 'lena', 'boat', 'baboon' trên mạng
+    original_image_path = 'lena.jpg'
     try:
-        img_noisy = cv2.imread('Grayscale-Boats-image-corrupted-with-50-Salt-Pepper-noise.png', cv2.IMREAD_GRAYSCALE) # Thay bằng đường dẫn ảnh của bạn
-        if img_noisy is None:
-             raise FileNotFoundError("Không tìm thấy file ảnh hoặc định dạng không hỗ trợ.")
-
-        # Áp dụng bộ lọc
-        img_filtered_adaptive = adaptive_two_pass_median_filter(img_noisy, w1_size=3, w2_size=3, a=1.0, b=1.0)
-
-        # Áp dụng bộ lọc trung vị chuẩn để so sánh
-        img_filtered_median = median_filter(img_noisy, size=3, mode='reflect')
-
-        # Hiển thị hoặc lưu kết quả
-        cv2.imshow('Ảnh gốc nhiễu', img_noisy)
-        cv2.imshow('Lọc trung vị chuẩn', img_filtered_median.astype(np.uint8))
-        cv2.imshow('Lọc trung vị thích ứng hai lượt', img_filtered_adaptive.astype(np.uint8))
-
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-        # cv2.imwrite('filtered_adaptive.png', img_filtered_adaptive)
-        # cv2.imwrite('filtered_median.png', img_filtered_median)
+        img_original = cv2.imread(original_image_path, cv2.IMREAD_GRAYSCALE)
+        if img_original is None:
+             raise FileNotFoundError(f"Không tìm thấy file ảnh gốc: {original_image_path}")
+        print(f"Đã tải ảnh gốc thành công: {original_image_path} - Kích thước: {img_original.shape}")
 
     except FileNotFoundError as e:
         print(e)
+        exit() # Thoát nếu không tải được ảnh gốc
     except Exception as e:
-        print(f"Đã xảy ra lỗi: {e}")
+        print(f"Đã xảy ra lỗi khi đọc ảnh gốc: {e}")
+        exit()
 
-    # Ví dụ với dữ liệu numpy tự tạo
-    print("\nVí dụ với dữ liệu tự tạo:")
-    np.random.seed(0)
-    test_data = np.zeros((10, 10)) + 100
-    # Thêm nhiễu xung
-    noise_level = 0.2
-    coords = np.random.randint(0, 10, size=(int(10*10*noise_level), 2))
-    vals = np.random.choice([0, 255], size=len(coords))
-    test_data[coords[:, 0], coords[:, 1]] = vals
-    print("Dữ liệu nhiễu:\n", test_data.astype(int))
+    # --- 2. Thiết lập các mức nhiễu và danh sách lưu kết quả ---
+    noise_percentages = np.arange(5, 101, 5) # Từ 5% đến 100%, bước nhảy 5%
+    mse_results = []
+    mae_results = []
 
-    filtered_data = adaptive_two_pass_median_filter(test_data, w1_size=3, w2_size=3, a=1.0, b=1.0)
-    print("\nDữ liệu sau khi lọc:\n", filtered_data.astype(int))
+    print("\nBắt đầu quá trình thêm nhiễu, lọc và tính lỗi...")
+    # --- 3. Vòng lặp qua các mức nhiễu ---
+    for percent in noise_percentages:
+        noise_fraction = percent / 100.0
+        print(f"Đang xử lý nhiễu {percent}%...")
+
+        # Thêm nhiễu vào ảnh gốc
+        img_noisy = add_salt_and_pepper_noise(img_original, noise_fraction)
+
+        # Áp dụng bộ lọc thích ứng
+        # Bạn có thể thay đổi w1_size, w2_size, a, b nếu muốn thử nghiệm
+        img_filtered = adaptive_two_pass_median_filter(img_noisy, w1_size=3, w2_size=3, a=1.0, b=1.0)
+
+        # Tính toán MSE và MAE giữa ảnh gốc và ảnh đã lọc
+        current_mse = calculate_mse(img_original, img_filtered)
+        current_mae = calculate_mae(img_original, img_filtered)
+
+        # Lưu kết quả
+        mse_results.append(current_mse)
+        mae_results.append(current_mae)
+
+        # (Tùy chọn) Hiển thị ảnh ở một mức nhiễu nào đó để kiểm tra
+        # if percent == 50:
+        #     cv2.imshow(f'Anh goc', img_original)
+        #     cv2.imshow(f'Nhieu {percent}%', img_noisy)
+        #     cv2.imshow(f'Loc voi nhieu {percent}%', img_filtered)
+        #     cv2.waitKey(0)
+        #     cv2.destroyAllWindows()
+
+    print("Hoàn tất quá trình tính toán lỗi.")
+
+    # --- 4. Vẽ biểu đồ ---
+    print("Đang vẽ biểu đồ...")
+    plt.figure(figsize=(12, 5)) # Kích thước cửa sổ biểu đồ
+
+    # Biểu đồ MSE
+    plt.subplot(1, 2, 1) # 1 hàng, 2 cột, vị trí thứ 1
+    plt.plot(noise_percentages, mse_results, marker='o', linestyle='-', color='b')
+    plt.title('MSE theo Tỷ lệ nhiễu Salt & Pepper')
+    plt.xlabel('Tỷ lệ nhiễu Salt & Pepper (%)')
+    plt.ylabel('Mean Squared Error (MSE)')
+    plt.xticks(noise_percentages) # Hiển thị rõ các mốc % trên trục x
+    plt.grid(True) # Hiện lưới
+
+    # Biểu đồ MAE
+    plt.subplot(1, 2, 2) # 1 hàng, 2 cột, vị trí thứ 2
+    plt.plot(noise_percentages, mae_results, marker='s', linestyle='--', color='r')
+    plt.title('MAE theo Tỷ lệ nhiễu Salt & Pepper')
+    plt.xlabel('Tỷ lệ nhiễu Salt & Pepper (%)')
+    plt.ylabel('Mean Absolute Error (MAE)')
+    plt.xticks(noise_percentages)
+    plt.grid(True)
+
+    plt.tight_layout() # Tự động điều chỉnh khoảng cách giữa các biểu đồ
+    plt.show() # Hiển thị cửa sổ biểu đồ
+
+    print("Hoàn thành!")
