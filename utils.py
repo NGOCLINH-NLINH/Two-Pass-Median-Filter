@@ -39,34 +39,67 @@ def add_salt_and_pepper_noise(image, noise_percentage):
 
     return noisy_image.astype(original_dtype)
 
-def add_gaussian_noise(image, std_dev, noise_percentage):
+
+def add_salt_and_pepper_noise_channel_wise(image, noise_percentage):
     """
-    Thêm nhiễu Gaussian lên một tỷ lệ phần trăm pixel trong ảnh (giống Salt & Pepper style).
+    Thêm nhiễu Salt & Pepper theo channel-wise vào ảnh màu RGB.
+
+    Parameters:
+        image (np.ndarray): Ảnh đầu vào dạng uint8, RGB.
+        noise_percentage (float): Xác suất mỗi pixel bị nhiễu (0.0 đến 1.0).
+
+    Returns:
+        np.ndarray: Ảnh bị nhiễu.
+    """
+    noisy_image = np.copy(image)
+    original_dtype = image.dtype
+
+    if image.ndim == 2:
+        # Ảnh grayscale: giữ nguyên như cũ
+        height, width = image.shape
+        rand = np.random.rand(height, width)
+        salt_mask = rand < (noise_percentage / 2)
+        pepper_mask = (rand >= (noise_percentage / 2)) & (rand < noise_percentage)
+
+        noisy_image[salt_mask] = 255
+        noisy_image[pepper_mask] = 0
+
+    elif image.ndim == 3 and image.shape[2] == 3:
+        # Ảnh màu: nhiễu theo từng kênh
+        height, width, channels = image.shape
+        for c in range(channels):
+            rand = np.random.rand(height, width)
+            salt_mask = rand < (noise_percentage / 2)
+            pepper_mask = (rand >= (noise_percentage / 2)) & (rand < noise_percentage)
+
+            noisy_image[:, :, c][salt_mask] = 255
+            noisy_image[:, :, c][pepper_mask] = 0
+
+    else:
+        raise ValueError("Chỉ hỗ trợ ảnh grayscale (2D) hoặc ảnh màu RGB (3D với 3 kênh).")
+
+    return noisy_image.astype(original_dtype)
+
+def add_gaussian_noise(image, std_dev):
+    """
+    Thêm nhiễu Gaussian lên toàn bộ ảnh.
 
     Args:
         image (np.ndarray): Ảnh đầu vào (grayscale hoặc RGB).
         std_dev (float): Độ lệch chuẩn của nhiễu Gaussian.
-        noise_percentage (float): Tỷ lệ pixel bị nhiễu (0.0 đến 1.0).
 
     Returns:
-        np.ndarray: Ảnh bị nhiễu Gaussian một phần.
+        np.ndarray: Ảnh bị nhiễu Gaussian.
     """
     noisy_image = image.astype(np.float64)
-    height, width = image.shape[:2]
-    total_pixels = height * width
-    num_noisy = int(noise_percentage * total_pixels)
-
-    flat_indices = np.random.choice(total_pixels, num_noisy, replace=False)
-    rows = flat_indices // width
-    cols = flat_indices % width
 
     if image.ndim == 2:  # Grayscale
-        noise = np.random.normal(0, std_dev, num_noisy)
-        noisy_image[rows, cols] += noise
+        noise = np.random.normal(0, std_dev, image.shape)
+        noisy_image += noise
 
     elif image.ndim == 3 and image.shape[2] == 3:  # Color
-        noise = np.random.normal(0, std_dev, (num_noisy, 3))
-        noisy_image[rows, cols, :] += noise
+        noise = np.random.normal(0, std_dev, image.shape)
+        noisy_image += noise
 
     else:
         raise ValueError("Ảnh đầu vào phải là grayscale (2D) hoặc RGB (3D với 3 kênh).")
@@ -78,36 +111,27 @@ def add_gaussian_noise(image, std_dev, noise_percentage):
     else:
         return np.clip(noisy_image, 0.0, 255.0)
 
-def add_speckle_noise(image, variance, noise_percentage):
+def add_speckle_noise(image, variance):
     """
-    Thêm nhiễu Speckle (nhân) lên một tỷ lệ phần trăm pixel (giống Salt & Pepper style).
+    Thêm nhiễu Speckle (nhân) lên toàn bộ ảnh.
 
     Args:
         image (np.ndarray): Ảnh đầu vào (grayscale hoặc RGB).
         variance (float): Phương sai của nhiễu Gaussian nhân.
-        noise_percentage (float): Tỷ lệ pixel bị nhiễu (0.0 đến 1.0).
 
     Returns:
-        np.ndarray: Ảnh bị nhiễu Speckle một phần.
+        np.ndarray: Ảnh bị nhiễu Speckle.
     """
     noisy_image = image.astype(np.float64)
-    height, width = image.shape[:2]
-    total_pixels = height * width
-    num_noisy = int(noise_percentage * total_pixels)
-
-    flat_indices = np.random.choice(total_pixels, num_noisy, replace=False)
-    rows = flat_indices // width
-    cols = flat_indices % width
-
     std_dev = np.sqrt(variance)
 
     if image.ndim == 2:  # Grayscale
-        noise = np.random.normal(0, std_dev, num_noisy)
-        noisy_image[rows, cols] += noisy_image[rows, cols] * noise
+        noise = np.random.normal(0, std_dev, image.shape)
+        noisy_image += noisy_image * noise
 
     elif image.ndim == 3 and image.shape[2] == 3:  # Color
-        noise = np.random.normal(0, std_dev, (num_noisy, 3))
-        noisy_image[rows, cols, :] += noisy_image[rows, cols, :] * noise
+        noise = np.random.normal(0, std_dev, image.shape)
+        noisy_image += noisy_image * noise
 
     else:
         raise ValueError("Ảnh đầu vào phải là grayscale (2D) hoặc RGB (3D với 3 kênh).")

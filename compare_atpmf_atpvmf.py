@@ -31,6 +31,39 @@ if original_image is None:
 
 print(f"Kích thước ảnh gốc: {original_image.shape}")
 
+# In ra ảnh đã xử lý cho mức nhiễu 80%
+display_noise_percentage = 0.80
+# Tìm mức nhiễu gần nhất trong danh sách nếu 0.80 không có sẵn
+print(f"\n--- Hiển thị ảnh cho mức nhiễu: {display_noise_percentage * 100:.1f}% ---")
+noisy_image = add_salt_and_pepper_noise(original_image.copy(), noise_percentage=display_noise_percentage)
+
+filtered_atpmf = atpmf_color_per_channel(noisy_image, W1_size=W1_SIZE, W2_size=W2_SIZE, a=PARAM_A, b=PARAM_B)
+filtered_atpvmf = adaptive_two_pass_vmf_optimized(noisy_image, W1_size=W1_SIZE, W2_size=W2_SIZE, a=PARAM_A, b=PARAM_B)
+
+plt.figure(figsize=(18, 6))
+plt.suptitle(f'Ảnh Màu (Color) - Nhiễu: {display_noise_percentage * 100:.1f}%', fontsize=16)
+
+plt.subplot(1, 4, 1)
+plt.imshow(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+plt.title('Ảnh Gốc (Color)')
+plt.axis('off')
+
+plt.subplot(1, 4, 2)
+plt.imshow(cv2.cvtColor(noisy_image, cv2.COLOR_BGR2RGB))
+plt.title('Ảnh Nhiễu (Color)')
+plt.axis('off')
+
+plt.subplot(1, 4, 3)
+plt.imshow(cv2.cvtColor(filtered_atpmf, cv2.COLOR_BGR2RGB))
+plt.title('Ảnh Lọc (Color ATPMF)')
+plt.axis('off')
+
+plt.subplot(1, 4, 4)
+plt.imshow(cv2.cvtColor(filtered_atpvmf, cv2.COLOR_BGR2RGB))
+plt.title('Ảnh Lọc (Color ATPVMF)')
+plt.axis('off')
+plt.show()  # Hiển thị cửa sổ so sánh ảnh màu
+
 mae_results_atpmf = []
 mae_results_atvmf = []
 processing_times_atpmf = []

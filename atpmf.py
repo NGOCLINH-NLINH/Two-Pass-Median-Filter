@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.ndimage import median_filter
 import cv2 # Sử dụng OpenCV để đọc/ghi ảnh (tùy chọn)
+from utils import add_salt_and_pepper_noise
+from utils import add_gaussian_noise
+from utils import add_speckle_noise
 
 def atpmf_grayscale(X, W1_size=3, W2_size=3, a=1.0, b=1.0):
     """
@@ -157,33 +160,32 @@ def atpmf_color_per_channel(X_color, W1_size=3, W2_size=3, a=1.0, b=1.0):
 
 
 
-def add_gaussian_noise(image, mean=0, var=10):
-    sigma = var*0.5
-    gauss = np.random.normal(mean, sigma, size=image.shape).astype('float32')  # Use size parameter
-    noisy = image.astype('float32') + gauss
-    noisy = np.clip(noisy, 0, 255)
-    return noisy.astype('uint8')
+# def add_gaussian_noise(image, mean=0, var=10):
+#     sigma = var*0.5
+#     gauss = np.random.normal(mean, sigma, size=image.shape).astype('float32')  # Use size parameter
+#     noisy = image.astype('float32') + gauss
+#     noisy = np.clip(noisy, 0, 255)
+#     return noisy.astype('uint8')
+#
+# def add_speckle_noise(image):
+#     noise = np.random.randn(*image.shape).astype('float32')  # Unpack the shape tuple
+#     noisy = image.astype('float32') + image.astype('float32') * noise
+#     return np.clip(noisy, 0, 255).astype('uint8')
 
-def add_speckle_noise(image):
-    noise = np.random.randn(*image.shape).astype('float32')  # Unpack the shape tuple
-    noisy = image.astype('float32') + image.astype('float32') * noise
-    return np.clip(noisy, 0, 255).astype('uint8')
 
-
-
-def add_salt_and_pepper_noise(image, salt_prob, pepper_prob):
-    noisy = np.copy(image)
-    # Salt noise
-    num_salt = np.ceil(salt_prob * image.size)
-    coords = [np.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
-    noisy[coords[0], coords[1]] = 255
-
-    # Pepper noise
-    num_pepper = np.ceil(pepper_prob * image.size)
-    coords = [np.random.randint(0, i - 1, int(num_pepper)) for i in image.shape]
-    noisy[coords[0], coords[1]] = 0
-
-    return noisy.astype(image.dtype)
+# def add_salt_and_pepper_noise(image, salt_prob, pepper_prob):
+#     noisy = np.copy(image)
+#     # Salt noise
+#     num_salt = np.ceil(salt_prob * image.size)
+#     coords = [np.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
+#     noisy[coords[0], coords[1]] = 255
+#
+#     # Pepper noise
+#     num_pepper = np.ceil(pepper_prob * image.size)
+#     coords = [np.random.randint(0, i - 1, int(num_pepper)) for i in image.shape]
+#     noisy[coords[0], coords[1]] = 0
+#
+#     return noisy.astype(image.dtype)
 
 
 # --- Ví dụ sử dụng ---
@@ -191,7 +193,7 @@ if __name__ == "__main__":
     # --- Ví dụ cho ảnh thang độ xám ---
     try:
         # Đọc ảnh thang độ xám (thay 'grayscale_image.png' bằng đường dẫn thực tế)
-        image_origin = cv2.imread('images/anhdomixi.png')
+        image_origin = cv2.imread('images/anhdomixi***.png')
         gray_image = cv2.cvtColor(image_origin, cv2.COLOR_BGR2GRAY)
         if gray_image is None:
             print("Không thể đọc ảnh thang độ xám.")
@@ -220,7 +222,7 @@ if __name__ == "__main__":
 
 
             # thêm nhiễu Gaussian
-            gaussian_noisy_gray_image = add_gaussian_noise(gray_image, mean=0, var=10)
+            gaussian_noisy_gray_image = add_gaussian_noise(gray_image, std_dev=25)
             cv2.imshow('gaussian_gray_image.png', gaussian_noisy_gray_image)
 
             filtered_gaussian_gray_image = atpmf_grayscale(gaussian_noisy_gray_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
@@ -228,14 +230,13 @@ if __name__ == "__main__":
 
 
             # Thêm nhiễu speckle
-            speckle_noisy_gray_image = add_speckle_noise(gray_image)
+            speckle_noisy_gray_image = add_speckle_noise(gray_image, variance=0.02)
             cv2.imshow('speckle_noisy_gray_image.png', speckle_noisy_gray_image)
             print("Đã tạo ảnh thang độ xám bị nhiễu speckle: speckle_noisy_gray_image.png")
 
             filtered_speckle_gray_image = atpmf_grayscale(speckle_noisy_gray_image, W1_size=3, W2_size=3, a=1.0, b=1.0)
             cv2.imshow('filtered_speckle_gray_image.png', filtered_speckle_gray_image)
             print("Đã lọc ảnh thang độ xám bị nhiễu speckle: filtered_speckle_gray_image.png")
-
 
 
             # Áp dụng bộ lọc ATPMF
@@ -270,28 +271,19 @@ if __name__ == "__main__":
             cv2.imshow('original_color_image.png', color_image)
 
             # --- Thêm nhiễu Salt & Pepper ---
-            noise_ratio_sp = 0.5 # Tỷ lệ nhiễu S&P
-            noisy_color_image_sp = color_image.copy()
-            num_noise_per_channel = int(noise_ratio_sp * color_image.shape[0] * color_image.shape[1])
-
-            for i in range(3): # Lặp qua 3 kênh màu
-                # Salt noise
-                salt_coords = [np.random.randint(0, dim - 1, num_noise_per_channel // 2) for dim in color_image.shape[:2]]
-                noisy_color_image_sp[salt_coords[0], salt_coords[1], i] = 255
-                 # Pepper noise
-                pepper_coords = [np.random.randint(0, dim - 1, num_noise_per_channel // 2) for dim in color_image.shape[:2]]
-                noisy_color_image_sp[pepper_coords[0], pepper_coords[1], i] = 0
+            noise_ratio_sp = 0.2 # Tỷ lệ nhiễu S&P
+            noisy_color_image_sp = add_salt_and_pepper_noise(color_image.copy(), noise_ratio_sp)
 
             cv2.imshow('sp_noisy_color_image.png', noisy_color_image_sp)
             print("Đã tạo ảnh màu bị nhiễu Salt & Pepper: sp_noisy_color_image.png")
 
             # --- Thêm nhiễu Gaussian ---
-            gaussian_noisy_color_image = add_gaussian_noise(color_image, mean=0, var=20) # Tăng var cho ảnh màu
+            gaussian_noisy_color_image = add_gaussian_noise(color_image, std_dev=25)
             cv2.imshow('gaussian_noisy_color_image.png', gaussian_noisy_color_image)
             print("Đã tạo ảnh màu bị nhiễu Gaussian: gaussian_noisy_color_image.png")
 
             # --- Thêm nhiễu Speckle ---
-            speckle_noisy_color_image = add_speckle_noise(color_image)
+            speckle_noisy_color_image = add_speckle_noise(color_image, variance=0.02)
             cv2.imshow('speckle_noisy_color_image.png', speckle_noisy_color_image)
             print("Đã tạo ảnh màu bị nhiễu Speckle: speckle_noisy_color_image.png")
 
