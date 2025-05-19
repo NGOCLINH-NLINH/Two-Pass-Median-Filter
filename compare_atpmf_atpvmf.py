@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm # Để theo dõi tiến trình
 from atpmf import atpmf_color_per_channel
-from color_filter import adaptive_two_pass_vmf_optimized
+from atpvmf import adaptive_two_pass_vmf_optimized
 from utils import add_salt_and_pepper_noise
 from utils import calculate_mse
 from utils import calculate_mae

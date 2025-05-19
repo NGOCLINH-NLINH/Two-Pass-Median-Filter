@@ -3,64 +3,39 @@ import cv2
 
 def add_salt_and_pepper_noise(image, noise_percentage):
     """
-    Thêm nhiễu Salt & Pepper vào ảnh grayscale hoặc ảnh màu.
+    Thêm nhiễu Salt & Pepper vào ảnh (tuân theo phân phối nhị thức).
 
     Tham số:
         image (numpy.ndarray): Ảnh đầu vào (grayscale hoặc màu, dtype uint8).
-        noise_percentage (float): Tỷ lệ phần trăm pixel bị nhiễu (0.0 đến 1.0).
+        noise_percentage (float): Xác suất mỗi pixel bị nhiễu (0.0 đến 1.0).
 
     Trả về:
-        numpy.ndarray: Ảnh bị nhiễu (cùng dtype với ảnh đầu vào).
+        numpy.ndarray: Ảnh bị nhiễu.
     """
     noisy_image = np.copy(image)
     original_dtype = image.dtype
 
     if image.ndim == 2:  # Grayscale
         height, width = image.shape
-        num_pixels = height * width
-        num_noisy_pixels = int(noise_percentage * num_pixels)
+        # Tạo mask nhiễu với xác suất p cho mỗi pixel
+        rand = np.random.rand(height, width)
+        salt_mask = rand < (noise_percentage / 2)
+        pepper_mask = (rand >= (noise_percentage / 2)) & (rand < noise_percentage)
 
-        num_salt = num_noisy_pixels // 2
-        num_pepper = num_noisy_pixels - num_salt
+        noisy_image[salt_mask] = 255
+        noisy_image[pepper_mask] = 0
 
-        flat_indices = np.arange(num_pixels)
-        salt_indices = np.random.choice(flat_indices, num_salt, replace=False)
-
-        remaining_indices = np.setdiff1d(flat_indices, salt_indices, assume_unique=True)
-        pepper_indices = np.random.choice(remaining_indices, num_pepper, replace=False)
-
-        salt_rows = salt_indices // width
-        salt_cols = salt_indices % width
-        noisy_image[salt_rows, salt_cols] = 255
-
-        pepper_rows = pepper_indices // width
-        pepper_cols = pepper_indices % width
-        noisy_image[pepper_rows, pepper_cols] = 0
-
-    elif image.ndim == 3 and image.shape[2] == 3:  # Color
+    elif image.ndim == 3 and image.shape[2] == 3:  # Màu RGB
         height, width, _ = image.shape
-        num_pixels = height * width
-        num_noisy_pixels = int(noise_percentage * num_pixels)
+        rand = np.random.rand(height, width)
+        salt_mask = rand < (noise_percentage / 2)
+        pepper_mask = (rand >= (noise_percentage / 2)) & (rand < noise_percentage)
 
-        num_salt = num_noisy_pixels // 2
-        num_pepper = num_noisy_pixels - num_salt
-
-        flat_indices = np.arange(num_pixels)
-        salt_indices = np.random.choice(flat_indices, num_salt, replace=False)
-
-        remaining_indices = np.setdiff1d(flat_indices, salt_indices, assume_unique=True)
-        pepper_indices = np.random.choice(remaining_indices, num_pepper, replace=False)
-
-        salt_rows = salt_indices // width
-        salt_cols = salt_indices % width
-        noisy_image[salt_rows, salt_cols, :] = 255
-
-        pepper_rows = pepper_indices // width
-        pepper_cols = pepper_indices % width
-        noisy_image[pepper_rows, pepper_cols, :] = 0
+        noisy_image[salt_mask] = [255, 255, 255]
+        noisy_image[pepper_mask] = [0, 0, 0]
 
     else:
-        raise ValueError("Chỉ hỗ trợ ảnh grayscale (2D) hoặc ảnh màu RGB/BGR (3D với 3 kênh).")
+        raise ValueError("Chỉ hỗ trợ ảnh grayscale (2D) hoặc ảnh màu RGB (3D với 3 kênh).")
 
     return noisy_image.astype(original_dtype)
 
