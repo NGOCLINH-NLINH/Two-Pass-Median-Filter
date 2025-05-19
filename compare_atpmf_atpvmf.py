@@ -5,87 +5,14 @@ import cv2
 import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm # Để theo dõi tiến trình
-
-# Import các hàm từ các file của bạn
-# Đảm bảo atpmf.py và color_filter.py nằm cùng thư mục
-try:
-    from atpmf import atpmf_color_per_channel
-    print("Đã import thành công atpmf_color_per_channel từ atpmf.py")
-except ImportError:
-    print("Lỗi: Không thể import atpmf_color_per_channel. Đảm bảo file atpmf.py tồn tại và không có lỗi.")
-    exit()
-except Exception as e:
-    print(f"Lỗi khi import từ atpmf.py: {e}")
-    exit()
-
-try:
-    # Đảm bảo import đúng hàm đã tối ưu
-    from color_filter import adaptive_two_pass_vmf_optimized
-    print("Đã import thành công adaptive_two_pass_vmf_optimized từ color_filter.py")
-except ImportError:
-    print("Lỗi: Không thể import adaptive_two_pass_vmf_optimized. Đảm bảo file color_filter.py tồn tại và không có lỗi.")
-    exit()
-except Exception as e:
-    print(f"Lỗi khi import từ color_filter.py: {e}")
-    exit()
-
-# --- Hàm Helper ---
-
-def add_salt_pepper_color(image, noise_percentage):
-    """
-    Thêm nhiễu Salt & Pepper vào ảnh màu.
-
-    Tham số:
-        image (numpy.ndarray): Ảnh màu đầu vào (BGR, uint8).
-        noise_percentage (float): Tỷ lệ phần trăm tổng số pixel bị nhiễu (0.0 đến 1.0).
-
-    Trả về:
-        numpy.ndarray: Ảnh màu bị nhiễu (uint8).
-    """
-    noisy_image = np.copy(image)
-    height, width, _ = image.shape
-    num_pixels = height * width
-    num_noisy_pixels = int(noise_percentage * num_pixels)
-
-    # Chia đều cho salt và pepper
-    num_salt = num_noisy_pixels // 2
-    num_pepper = num_noisy_pixels - num_salt
-
-    # Thêm nhiễu Salt (trắng)
-    # Chọn ngẫu nhiên các tọa độ pixel (không lặp lại)
-    salt_coords_flat = np.random.choice(num_pixels, num_salt, replace=False)
-    salt_rows = salt_coords_flat // width
-    salt_cols = salt_coords_flat % width
-    noisy_image[salt_rows, salt_cols, :] = 255 # Đặt cả 3 kênh thành trắng
-
-    # Thêm nhiễu Pepper (đen)
-    # Chọn ngẫu nhiên các tọa độ pixel khác (không trùng với salt)
-    # Tạo tập hợp tất cả các chỉ số pixel
-    all_coords_flat = np.arange(num_pixels)
-    # Loại bỏ các chỉ số đã dùng cho salt
-    available_for_pepper = np.setdiff1d(all_coords_flat, salt_coords_flat, assume_unique=True)
-    # Chọn từ các chỉ số còn lại
-    pepper_coords_flat = np.random.choice(available_for_pepper, num_pepper, replace=False)
-    pepper_rows = pepper_coords_flat // width
-    pepper_cols = pepper_coords_flat % width
-    noisy_image[pepper_rows, pepper_cols, :] = 0 # Đặt cả 3 kênh thành đen
-
-    return noisy_image.astype(image.dtype)
-
-def calculate_mae(image1, image2):
-    """
-    Tính toán Mean Absolute Error (MAE) giữa hai ảnh.
-    """
-    if image1.shape != image2.shape:
-        raise ValueError("Kích thước hai ảnh phải giống nhau để tính MAE.")
-    # Chuyển sang float để tránh lỗi tràn số khi trừ
-    img1_f = image1.astype(np.float64)
-    img2_f = image2.astype(np.float64)
-    mae = np.mean(np.abs(img1_f - img2_f))
-    return mae
+from atpmf import atpmf_color_per_channel
+from color_filter import adaptive_two_pass_vmf_optimized
+from utils import add_salt_and_pepper_noise
+from utils import calculate_mse
+from utils import calculate_mae
 
 # --- Cấu hình ---
-ORIGINAL_IMAGE_PATH = 'anhdomixi.png' # <<< THAY ĐỔI ĐƯỜNG DẪN NÀY
+ORIGINAL_IMAGE_PATH = 'images/lena_color.png'  # <<< THAY ĐỔI ĐƯỜNG DẪN NÀY
 NOISE_PERCENTAGES = np.arange(0.05, 1.01, 0.05) # 5%, 10%, ..., 100%
 
 # Tham số cho bộ lọc (có thể điều chỉnh nếu cần)
@@ -115,7 +42,7 @@ for noise_perc in tqdm(NOISE_PERCENTAGES, desc="Processing Noise Levels"):
     print(f"\n--- Đang xử lý mức nhiễu: {noise_perc*100:.0f}% ---")
 
     # 1. Thêm nhiễu Salt & Pepper
-    noisy_image = add_salt_pepper_color(original_image, noise_perc)
+    noisy_image = add_salt_and_pepper_noise(original_image, noise_perc)
     # (Tùy chọn) Lưu ảnh nhiễu để kiểm tra
     # cv2.imwrite(f"temp_noisy_{int(noise_perc*100)}.png", noisy_image)
 
@@ -158,7 +85,6 @@ for noise_perc in tqdm(NOISE_PERCENTAGES, desc="Processing Noise Levels"):
     print(f"MAE (ATVMF): {mae_atvmf:.4f}")
 
 # --- Hiển thị kết quả ---
-
 print("\n--- Kết quả MAE tổng hợp ---")
 print("-------------------------------------------")
 print("| Mức nhiễu (%) | MAE (ATPMF) | MAE (ATVMF) |")
@@ -180,22 +106,9 @@ plt.plot(NOISE_PERCENTAGES * 100, mae_results_atvmf, marker='s', linestyle='--',
 plt.title('So sánh MAE của ATPMF và Adaptive VMF với nhiễu Salt & Pepper')
 plt.xlabel('Tỷ lệ nhiễu Salt & Pepper (%)')
 plt.ylabel('Mean Absolute Error (MAE)')
-plt.xticks(NOISE_PERCENTAGES * 100) # Đảm bảo hiển thị các mốc %
+plt.xticks(NOISE_PERCENTAGES * 100)
 plt.grid(True)
 plt.legend()
 plt.show()
-
-# # --- Vẽ biểu đồ so sánh thời gian xử lý ---
-# plt.figure(figsize=(10, 6))
-# plt.plot(NOISE_PERCENTAGES * 100, processing_times_atpmf, marker='o', linestyle='-', label='ATPMF (Per Channel)')
-# plt.plot(NOISE_PERCENTAGES * 100, processing_times_atvmf, marker='s', linestyle='--', label='Adaptive VMF (Optimized)')
-#
-# plt.title('So sánh Thời gian xử lý của ATPMF và Adaptive VMF')
-# plt.xlabel('Tỷ lệ nhiễu Salt & Pepper (%)')
-# plt.ylabel('Thời gian xử lý (giây)')
-# plt.xticks(NOISE_PERCENTAGES * 100)
-# plt.grid(True)
-# plt.legend()
-# plt.show()
 
 print("\nHoàn thành so sánh.")

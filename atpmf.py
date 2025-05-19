@@ -191,7 +191,8 @@ if __name__ == "__main__":
     # --- Ví dụ cho ảnh thang độ xám ---
     try:
         # Đọc ảnh thang độ xám (thay 'grayscale_image.png' bằng đường dẫn thực tế)
-        gray_image = cv2.imread('lena*****.jpg', cv2.IMREAD_GRAYSCALE)
+        image_origin = cv2.imread('images/anhdomixi.png')
+        gray_image = cv2.cvtColor(image_origin, cv2.COLOR_BGR2GRAY)
         if gray_image is None:
             print("Không thể đọc ảnh thang độ xám.")
         else:
@@ -259,7 +260,7 @@ if __name__ == "__main__":
     # --- Ví dụ cho ảnh màu ---
     try:
         # Đọc ảnh màu (thay 'color_image.png' bằng đường dẫn thực tế)
-        color_image = cv2.imread('anhdomixi.png', cv2.IMREAD_COLOR)
+        color_image = cv2.imread('images/anhdomixi.png', cv2.IMREAD_COLOR)
         if color_image is None:
             print("Không thể đọc ảnh màu.")
         else:

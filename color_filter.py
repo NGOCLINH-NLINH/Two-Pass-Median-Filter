@@ -181,7 +181,7 @@ def adaptive_two_pass_vmf_optimized(noisy_image, W1_size=3, W2_size=3, a=1.0, b=
 # --- Ví dụ sử dụng (Giữ nguyên phần tạo nhiễu và gọi hàm) ---
 if __name__ == "__main__":
     # Đọc ảnh màu
-    input_image_path = 'images.jpg' # Thay bằng đường dẫn ảnh nhiễu
+    input_image_path = 'images/images.jpg'  # Thay bằng đường dẫn ảnh nhiễu
 
     # (Phần tạo nhiễu giữ nguyên nếu cần)
     # ... (code tạo noisy_image_sp) ...
